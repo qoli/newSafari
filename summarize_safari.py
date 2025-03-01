@@ -118,31 +118,45 @@ def summarize_text(client, text, title, user_input=None):
             temperature = 0.7
             prefix = "\n[bold green]🤖 回答：[/]\n" if user_input else ""
 
-        with console.status("[bold yellow]🤔 正在思考...[/]", spinner="dots") as status:
-            # 使用流式輸出
-            stream = client.chat.completions.create(
-                model=LLM_MODEL,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=8192,
-                top_p=0.95,
-                presence_penalty=0.1,
-                stream=True
-            )
+        # 顯示思考狀態
+        console.print("\n[bold yellow]🤔 正在思考...[/]")
+        
+        # 使用流式輸出
+        stream = client.chat.completions.create(
+            model=LLM_MODEL,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=8192,
+            top_p=0.95,
+            presence_penalty=0.1,
+            stream=True
+        )
 
-            # 收集完整回應
-            full_response = []
-            for chunk in stream:
-                if chunk.choices[0].delta.content:
-                    full_response.append(chunk.choices[0].delta.content)
+        # 先進行流式輸出
+        print(prefix.replace("[bold cyan]", "").replace("[/]", "").replace("[bold green]", ""), end="", flush=True)
+        full_response = []
+        for chunk in stream:
+            if chunk.choices[0].delta.content:
+                content = chunk.choices[0].delta.content
+                print(content, end="", flush=True)
+                full_response.append(content)
+        print()  # 換行
 
         # 組合完整回應
         complete_response = ''.join(full_response)
+
+        # 使用控制台清屏方法
+        console.clear()
         
-        # 使用 rich 渲染輸出
+        # 重新顯示對話模式的標題（如果在對話模式中）
+        if user_input is not None:
+            console.rule("[bold cyan]💬 對話模式[/]", characters="─")
+            console.print("[dim]您可以詢問任何關於該網頁內容的問題。輸入 'exit' 退出，輸入 're' 重新開始。[/]")
+        
+        # 使用 rich 重新渲染格式化的輸出
         console.print(prefix, end="")
         if user_input is None:
-            # 摘要模式
+            # 摘要模式，使用不同顏色突出顯示
             lines = complete_response.split('\n')
             for line in lines:
                 if line.startswith('總結：'):
@@ -152,7 +166,7 @@ def summarize_text(client, text, title, user_input=None):
                 else:
                     console.print(line)
         else:
-            # 對話模式
+            # 對話模式，使用 Markdown 渲染
             markdown = Markdown(complete_response)
             console.print(markdown)
         
@@ -216,16 +230,21 @@ def main():
 
     # 進入對話模式
     console.rule("[bold cyan]💬 對話模式[/]", characters="─")
-    console.print("[dim]您可以詢問任何關於該網頁內容的問題。輸入 'exit' 退出。[/]")
+    console.print("[dim]您可以詢問任何關於該網頁內容的問題。輸入 'exit' 退出，輸入 're' 重新開始。[/]")
     
     while True:
         try:
             # 使用 console.print 來正確顯示樣式化的輸入提示
             console.print("\n您的問題", style="bold purple", end=" > ")
             user_input = input()
-            if user_input.lower() == "exit":
+            user_command = user_input.lower()
+            if user_command == "exit":
                 console.rule("[bold cyan]👋 感謝使用[/]", characters="─")
                 break
+            elif user_command == "re":
+                console.print("\n[bold yellow]🔄 重新啟動程序...[/]")
+                # 使用遞迴調用來重新啟動程序
+                return main()
 
             # 使用相同的 summarize_text 函數進行對話
             chat_response = summarize_text(client,
