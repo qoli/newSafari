@@ -52,6 +52,65 @@ python main.py
 python summarize_safari.py --api-key YOUR_API_KEY
 ```
 
+### Raycast 腳本使用方法
+
+本工具提供兩種 Raycast 腳本：
+
+#### 1. Safari to Markdown（基本擷取模式）
+
+```applescript
+#!/usr/bin/osascript
+
+# Required parameters:
+# @raycast.schemaVersion 1
+# @raycast.title Safari to Markdown
+# @raycast.mode silent
+
+# Optional parameters:
+# @raycast.icon 📝
+
+# Documentation:
+# @raycast.author qoli
+# @raycast.authorURL https://raycast.com/qoli
+
+tell application "Terminal"
+    activate
+    do script "cd /Volumes/Data/Github/newSafari && python3 ./main.py && exit"
+end tell
+```
+
+#### 2. Safari Summarizy（互動式總結模式）
+
+```applescript
+#!/usr/bin/osascript
+
+# Required parameters:
+# @raycast.schemaVersion 1
+# @raycast.title Safari Summarizy
+# @raycast.mode silent
+
+# Optional parameters:
+# @raycast.icon 🤖
+
+# Documentation:
+# @raycast.author qoli
+# @raycast.authorURL https://raycast.com/qoli
+
+tell application "Terminal"
+    activate
+    do script "cd /Volumes/Data/Github/newSafari && python3 ./summarize_safari.py --api-key 'your-api-key-here'"
+end tell
+```
+
+設定步驟：
+1. 在 Raycast 中選擇 `Create Script Command`
+2. 選擇 `AppleScript` 作為腳本類型
+3. 根據需要複製對應的腳本內容
+4. 對於 Safari Summarizy 腳本，請替換 `your-api-key-here` 為您的 API 金鑰
+5. 儲存後即可在 Raycast 中使用對應的指令
+
+```
+
 ## 專案結構 📁
 
 ```
