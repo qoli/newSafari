@@ -82,6 +82,8 @@ def extract_text(html):
 
 def summarize_text(client, text, title, user_input=None):
     """調用 LLM API 來總結文本或進行對話，支持流式輸出"""
+    console = Console()
+    
     try:
         if user_input is None:
             # 初始總結模式
@@ -96,7 +98,7 @@ def summarize_text(client, text, title, user_input=None):
                 }
             ]
             temperature = 0.1
-            prefix = "\n📝 網頁摘要：\n"
+            prefix = "\n[bold cyan]📝 網頁摘要：[/]\n"
         else:
             # 對話模式
             messages = [
@@ -114,51 +116,47 @@ def summarize_text(client, text, title, user_input=None):
                 }
             ]
             temperature = 0.7
-            prefix = "\n🤖：" if user_input else ""
+            prefix = "\n[bold green]🤖 回答：[/]\n" if user_input else ""
 
-        print("🤔 正在思考回答...")
-        
-        # 使用流式輸出
-        stream = client.chat.completions.create(
-            model=LLM_MODEL,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=8192,
-            top_p=0.95,
-            presence_penalty=0.1,
-            stream=True
-        )
+        with console.status("[bold yellow]🤔 正在思考...[/]", spinner="dots") as status:
+            # 使用流式輸出
+            stream = client.chat.completions.create(
+                model=LLM_MODEL,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=8192,
+                top_p=0.95,
+                presence_penalty=0.1,
+                stream=True
+            )
 
-        # 先進行流式輸出
-        print(prefix, end="", flush=True)
-        full_response = []
-        for chunk in stream:
-            if chunk.choices[0].delta.content:
-                content = chunk.choices[0].delta.content
-                print(content, end="", flush=True)
-                full_response.append(content)
-        print()  # 換行
+            # 收集完整回應
+            full_response = []
+            for chunk in stream:
+                if chunk.choices[0].delta.content:
+                    full_response.append(chunk.choices[0].delta.content)
 
         # 組合完整回應
         complete_response = ''.join(full_response)
-
-        # 使用 ANSI 轉義序列清除先前輸出（包括思考提示和前綴）
-        lines_to_clear = complete_response.count('\n') + 3  # 包括思考提示和前綴
-        print("\033[F" * lines_to_clear + "\033[J")  # 清除從游標到屏幕底部的內容
         
-        # 使用 rich 渲染 Markdown
-        console = Console()
+        # 使用 rich 渲染輸出
+        console.print(prefix, end="")
         if user_input is None:
-            # 摘要模式，保持原有格式
-            markdown_text = complete_response
+            # 摘要模式
+            lines = complete_response.split('\n')
+            for line in lines:
+                if line.startswith('總結：'):
+                    console.print(f"[bold cyan]{line}[/]")
+                elif '：' in line:
+                    console.print(f"[bold yellow]{line}[/]")
+                else:
+                    console.print(line)
         else:
-            # 對話模式，添加適當的標記
-            markdown_text = complete_response
-            
-        # 渲染 Markdown
-        markdown = Markdown(markdown_text)
-        console.print(markdown)
-        print()  # 確保有足夠的空行
+            # 對話模式
+            markdown = Markdown(complete_response)
+            console.print(markdown)
+        
+        console.print()  # 確保有足夠的空行
 
         # 構造一個類似非流式響應的對象
         class SimpleResponse:
@@ -168,7 +166,7 @@ def summarize_text(client, text, title, user_input=None):
         return SimpleResponse(''.join(full_response))
 
     except Exception as e:
-        print(f"\n❌ LLM 請求錯誤: {e}")
+        console.print(f"\n[bold red]❌ LLM 請求錯誤: {str(e)}[/]")
         return None
 
 
@@ -180,49 +178,66 @@ def main():
     # 創建 rich console
     console = Console()
     
-    console.print("🚀 Safari 網頁助手", style="bold")
-    console.print("\n處理進度：", style="bold")
-
-    # 創建 OpenAI 客戶端
-    client = OpenAI(base_url=LLM_BASE_URL, api_key=args.api_key)
-
-    page_data = get_safari_content()
-    if page_data is None:
-        console.print("\n❌ 無法獲取頁面數據，程序終止", style="red")
-        return
-
-    console.print(f"\n✅ 成功獲取頁面：{page_data['title']}")
-    console.print(f"🔗 {page_data['url']}", style="blue underline")
-
-    title, extracted_text = extract_text(page_data["html"])
-    if extracted_text is None:
-        console.print("\n❌ 無法從頁面提取文本，程序終止", style="red")
-        return
-
-    console.print("✅ 成功提取文本內容")
-
-    summary_response = summarize_text(client, extracted_text, title)  # 獲取 response
-
-    if not summary_response:
-        console.print("\n❌ 無法生成摘要", style="red")
-        return
+    # 顯示程序標題
+    console.rule("[bold cyan]🚀 Safari 網頁助手[/]", characters="═")
     
-    # 進入對話模式
-    console.print("\n💬 對話模式", style="bold")
-    console.print("您可以詢問任何關於該網頁內容的問題。")
-    while True:
-        user_input = input("\n請輸入您的問題（或輸入 'exit' 退出）：")
-        if user_input.lower() == "exit":
-            break
-
-        # 使用相同的 summarize_text 函數進行對話
-        chat_response = summarize_text(client,
-                                     summary_response.choices[0].message.content,
-                                     title,
-                                     user_input)
+    with console.status("[bold yellow]初始化中...[/]") as status:
+        # 創建 OpenAI 客戶端
+        client = OpenAI(base_url=LLM_BASE_URL, api_key=args.api_key)
         
-        if not chat_response:
-            print("\n❌ 無法生成回應")
+        # 更新狀態
+        status.update("[bold yellow]正在獲取頁面內容...[/]")
+        page_data = get_safari_content()
+        if page_data is None:
+            console.print("\n[bold red]❌ 無法獲取頁面數據，程序終止[/]")
+            return
+
+        # 顯示頁面信息
+        console.print("\n[bold green]✅ 成功獲取頁面[/]")
+        console.print(f"📑 標題：[bold]{page_data['title']}[/]")
+        console.print(f"🔗 網址：[blue underline]{page_data['url']}[/]")
+
+        # 更新狀態
+        status.update("[bold yellow]正在提取文本內容...[/]")
+        title, extracted_text = extract_text(page_data["html"])
+        if extracted_text is None:
+            console.print("\n[bold red]❌ 無法從頁面提取文本，程序終止[/]")
+            return
+
+        console.print("\n[bold green]✅ 文本提取完成[/]")
+
+        # 更新狀態
+        status.update("[bold yellow]正在生成摘要...[/]")
+        summary_response = summarize_text(client, extracted_text, title)
+
+        if not summary_response:
+            console.print("\n[bold red]❌ 無法生成摘要[/]")
+            return
+
+    # 進入對話模式
+    console.rule("[bold cyan]💬 對話模式[/]", characters="─")
+    console.print("[dim]您可以詢問任何關於該網頁內容的問題。輸入 'exit' 退出。[/]")
+    
+    while True:
+        try:
+            # 使用 console.print 來正確顯示樣式化的輸入提示
+            console.print("\n您的問題", style="bold purple", end=" > ")
+            user_input = input()
+            if user_input.lower() == "exit":
+                console.rule("[bold cyan]👋 感謝使用[/]", characters="─")
+                break
+
+            # 使用相同的 summarize_text 函數進行對話
+            chat_response = summarize_text(client,
+                                         summary_response.choices[0].message.content,
+                                         title,
+                                         user_input)
+            
+            if not chat_response:
+                console.print("\n[bold red]❌ 無法生成回應[/]")
+        except KeyboardInterrupt:
+            console.print("\n\n[bold cyan]👋 感謝使用[/]")
+            break
 
 if __name__ == "__main__":
     main()
