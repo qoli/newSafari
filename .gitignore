@@ -1,0 +1,4 @@
+/output
+*.code-workspace
+.DS_Store
+/.vscode
