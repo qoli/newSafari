@@ -9,8 +9,11 @@ import argparse
 from openai import OpenAI
 from readability import Document
 import os
-from rich.console import Console
+from rich.console import Console, Group
 from rich.markdown import Markdown
+from rich.live import Live
+from rich.text import Text
+from rich.panel import Panel
 
 # LLM API 設定
 LLM_BASE_URL = "https://glama.ai/api/gateway/openai/v1"
@@ -121,7 +124,7 @@ def summarize_text(client, text, title, user_input=None):
         # 顯示思考狀態
         console.print("\n[bold yellow]🤔 正在思考...[/]")
         
-        # 使用流式輸出
+        # 創建流式輸出
         stream = client.chat.completions.create(
             model=LLM_MODEL,
             messages=messages,
@@ -132,45 +135,53 @@ def summarize_text(client, text, title, user_input=None):
             stream=True
         )
 
-        # 先進行流式輸出
-        print(prefix.replace("[bold cyan]", "").replace("[/]", "").replace("[bold green]", ""), end="", flush=True)
         full_response = []
-        for chunk in stream:
-            if chunk.choices[0].delta.content:
-                content = chunk.choices[0].delta.content
-                print(content, end="", flush=True)
-                full_response.append(content)
-        print()  # 換行
-
-        # 組合完整回應
-        complete_response = ''.join(full_response)
-
-        # 使用控制台清屏方法
-        console.clear()
         
-        # 重新顯示對話模式的標題（如果在對話模式中）
+        # 顯示對話模式標題（如果需要）
         if user_input is not None:
             console.rule("[bold cyan]💬 對話模式[/]", characters="─")
             console.print("[dim]您可以詢問任何關於該網頁內容的問題。輸入 'exit' 退出，輸入 're' 重新開始。[/]")
         
-        # 使用 rich 重新渲染格式化的輸出
-        console.print(prefix, end="")
-        if user_input is None:
-            # 摘要模式，使用不同顏色突出顯示
-            lines = complete_response.split('\n')
-            for line in lines:
-                if line.startswith('總結：'):
-                    console.print(f"[bold cyan]{line}[/]")
-                elif '：' in line:
-                    console.print(f"[bold yellow]{line}[/]")
-                else:
-                    console.print(line)
-        else:
-            # 對話模式，使用 Markdown 渲染
-            markdown = Markdown(complete_response)
-            console.print(markdown)
-        
-        console.print()  # 確保有足夠的空行
+        # 使用 Live 進行動態更新
+        with Live(
+            Text("正在生成回應...", style="yellow"),
+            console=console,
+            refresh_per_second=4,
+            vertical_overflow="visible"
+        ) as live:
+            # 流式接收和更新
+            for chunk in stream:
+                if chunk.choices[0].delta.content:
+                    content = chunk.choices[0].delta.content
+                    full_response.append(content)
+                    current_text = "".join(full_response)
+                    
+                    # 更新顯示內容
+                    if user_input is None:
+                        # 摘要模式，使用不同顏色突出顯示
+                        formatted_lines = []
+                        for line in current_text.split('\n'):
+                            if line.startswith('總結：'):
+                                formatted_lines.append(f"[bold cyan]{line}[/]")
+                            elif '：' in line:
+                                formatted_lines.append(f"[bold yellow]{line}[/]")
+                            else:
+                                formatted_lines.append(line)
+                        display_text = '\n'.join(formatted_lines)
+                    else:
+                        # 對話模式，使用 Markdown
+                        display_text = current_text
+                    
+                    # 直接更新顯示內容
+                    live.update(
+                        Group(
+                            Text.from_markup(prefix) if prefix else Text(""),
+                            Markdown(display_text) if user_input else Text.from_markup(display_text)
+                        )
+                    )
+
+        # 添加一個空行作為分隔
+        console.print()
 
         # 構造一個類似非流式響應的對象
         class SimpleResponse:
