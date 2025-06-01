@@ -16,8 +16,8 @@ from rich.text import Text
 from rich.panel import Panel
 
 # LLM API 設定
-LLM_BASE_URL = "https://glama.ai/api/gateway/openai/v1"
-LLM_MODEL = "gemini-2.0-pro-exp-02-05"
+LLM_BASE_URL = "http://192.168.10.1:1234/v1"
+LLM_MODEL = "qwen/qwen3-32b"
 
 def parse_arguments():
     """解析命令行參數"""
@@ -80,7 +80,7 @@ def extract_text(html):
         summary = doc.summary()
         return title, summary
     except Exception as e:
-        print(f"提取文本時發生錯誤: {e}")
+        print(f"提取文本時發生錯誤：{e}")
         return None, None
 
 def summarize_text(client, text, title, user_input=None):
@@ -139,8 +139,8 @@ def summarize_text(client, text, title, user_input=None):
         
         # 顯示對話模式標題（如果需要）
         if user_input is not None:
-            console.rule("[bold cyan]💬 對話模式[/]", characters="─")
-            console.print("[dim]您可以詢問任何關於該網頁內容的問題。輸入 'exit' 退出，輸入 're' 重新開始。[/]")
+            console.rule("[bold cyan]💬 對話模式 [/]", characters="─")
+            console.print("[dim] 您可以詢問任何關於該網頁內容的問題。輸入 'exit' 退出，輸入 're' 重新開始。[/]")
         
         # 使用 Live 進行動態更新
         with Live(
@@ -191,7 +191,7 @@ def summarize_text(client, text, title, user_input=None):
         return SimpleResponse(''.join(full_response))
 
     except Exception as e:
-        console.print(f"\n[bold red]❌ LLM 請求錯誤: {str(e)}[/]")
+        console.print(f"\n[bold red]❌ LLM 請求錯誤：{str(e)}[/]")
         return None
 
 
@@ -204,44 +204,44 @@ def main():
     console = Console()
     
     # 顯示程序標題
-    console.rule("[bold cyan]🚀 Safari 網頁助手[/]", characters="═")
+    console.rule("[bold cyan]🚀 Safari 網頁助手 [/]", characters="═")
     
-    with console.status("[bold yellow]初始化中...[/]") as status:
+    with console.status("[bold yellow] 初始化中...[/]") as status:
         # 創建 OpenAI 客戶端
         client = OpenAI(base_url=LLM_BASE_URL, api_key=args.api_key)
         
         # 更新狀態
-        status.update("[bold yellow]正在獲取頁面內容...[/]")
+        status.update("[bold yellow] 正在獲取頁面內容...[/]")
         page_data = get_safari_content()
         if page_data is None:
-            console.print("\n[bold red]❌ 無法獲取頁面數據，程序終止[/]")
+            console.print("\n[bold red]❌ 無法獲取頁面數據，程序終止 [/]")
             return
 
         # 顯示頁面信息
-        console.print("\n[bold green]✅ 成功獲取頁面[/]")
+        console.print("\n[bold green]✅ 成功獲取頁面 [/]")
         console.print(f"📑 標題：[bold]{page_data['title']}[/]")
         console.print(f"🔗 網址：[blue underline]{page_data['url']}[/]")
 
         # 更新狀態
-        status.update("[bold yellow]正在提取文本內容...[/]")
+        status.update("[bold yellow] 正在提取文本內容...[/]")
         title, extracted_text = extract_text(page_data["html"])
         if extracted_text is None:
-            console.print("\n[bold red]❌ 無法從頁面提取文本，程序終止[/]")
+            console.print("\n[bold red]❌ 無法從頁面提取文本，程序終止 [/]")
             return
 
-        console.print("\n[bold green]✅ 文本提取完成[/]")
+        console.print("\n[bold green]✅ 文本提取完成 [/]")
 
         # 更新狀態
-        status.update("[bold yellow]正在生成摘要...[/]")
+        status.update("[bold yellow] 正在生成摘要...[/]")
         summary_response = summarize_text(client, extracted_text, title)
 
         if not summary_response:
-            console.print("\n[bold red]❌ 無法生成摘要[/]")
+            console.print("\n[bold red]❌ 無法生成摘要 [/]")
             return
 
     # 進入對話模式
-    console.rule("[bold cyan]💬 對話模式[/]", characters="─")
-    console.print("[dim]您可以詢問任何關於該網頁內容的問題。輸入 'exit' 退出，輸入 're' 重新開始。[/]")
+    console.rule("[bold cyan]💬 對話模式 [/]", characters="─")
+    console.print("[dim] 您可以詢問任何關於該網頁內容的問題。輸入 'exit' 退出，輸入 're' 重新開始。[/]")
     
     while True:
         try:
@@ -250,7 +250,7 @@ def main():
             user_input = input()
             user_command = user_input.lower()
             if user_command == "exit":
-                console.rule("[bold cyan]👋 感謝使用[/]", characters="─")
+                console.rule("[bold cyan]👋 感謝使用 [/]", characters="─")
                 break
             elif user_command == "re":
                 console.print("\n[bold yellow]🔄 重新啟動程序...[/]")
@@ -264,9 +264,9 @@ def main():
                                          user_input)
             
             if not chat_response:
-                console.print("\n[bold red]❌ 無法生成回應[/]")
+                console.print("\n[bold red]❌ 無法生成回應 [/]")
         except KeyboardInterrupt:
-            console.print("\n\n[bold cyan]👋 感謝使用[/]")
+            console.print("\n\n[bold cyan]👋 感謝使用 [/]")
             break
 
 if __name__ == "__main__":
